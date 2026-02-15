@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Home, Heart, Search, User, Plus, Minus, Check, MessageCircle, X, ChevronRight, Package, LogOut, Sparkles, Crown, ChevronDown, CreditCard, Tag, Ticket, Lock, Edit3, Share2 } from 'lucide-react';
+import { ShoppingBag, Home, Heart, Search, User, Plus, Minus, Check, MessageCircle, X, ChevronRight, Package, LogOut, Sparkles, Crown, ChevronDown, CreditCard, Tag, Ticket, Lock, Edit3, Share2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -1453,9 +1453,17 @@ export default function Store() {
     const toggleCart = (product, qty = 1) => {
         setCart(prev => {
             const existing = prev.findIndex(item => item.id === product.id);
+            const currentQty = existing >= 0 ? (prev[existing].qty || 1) : 0;
+            const newQty = currentQty + qty;
+
+            if (newQty > (product.stock_quantity || 0)) {
+                showToast(`Apenas ${product.stock_quantity || 0} unidades disponíveis!`);
+                return prev;
+            }
+
             if (existing >= 0) {
                 const updated = [...prev];
-                updated[existing] = { ...updated[existing], qty: (updated[existing].qty || 1) + qty };
+                updated[existing] = { ...updated[existing], qty: newQty };
                 return updated;
             }
             return [...prev, { ...product, qty }];
@@ -1465,6 +1473,12 @@ export default function Store() {
 
     const updateCartQty = (idx, newQty) => {
         setCart(prev => {
+            const item = prev[idx];
+            if (newQty > (item.stock_quantity || 0)) {
+                showToast(`Máximo de ${item.stock_quantity} unidades!`);
+                return prev;
+            }
+
             const updated = [...prev];
             if (newQty <= 0) return updated.filter((_, i) => i !== idx);
             updated[idx] = { ...updated[idx], qty: newQty };
@@ -1581,6 +1595,16 @@ export default function Store() {
                 {/* Safe area spacer for non-home tabs (no header to absorb notch space) */}
                 {activeTab !== 'home' && (
                     <div className="md:hidden bg-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }} />
+                )}
+
+                {/* Toast Notification */}
+                {toast && (
+                    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
+                        <div className="bg-stone-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 border border-white/10">
+                            <AlertTriangle size={18} className="text-amber-400" />
+                            <span className="text-sm font-bold">{toast}</span>
+                        </div>
+                    </div>
                 )}
 
                 {/* Content Container */}

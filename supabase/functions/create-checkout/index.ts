@@ -27,6 +27,42 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // --- SECURITY: Server-Side Price Validation ---
+        // 1. Extract IDs to fetch from DB
+        const productIds = items
+            .filter((i: any) => i.id && typeof i.id === 'string' && i.price > 0)
+            .map((i: any) => i.id);
+
+        let dbProducts: any[] = [];
+        if (productIds.length > 0) {
+            const { data: dbData, error: dbError } = await supabaseAdmin
+                .from('products')
+                .select('id, price, name')
+                .in('id', productIds);
+
+            if (!dbError && dbData) {
+                dbProducts = dbData;
+            } else {
+                console.error("Error fetching products for validation:", dbError);
+            }
+        }
+
+        // 2. Rebuild items with Trusted Data
+        const validatedItems = items.map((item: any) => {
+            // Find authoritative product data
+            const dbProduct = dbProducts.find(p => String(p.id) === String(item.id));
+            if (dbProduct) {
+                console.log(`Validating ${item.name}: Client Price ${item.price} -> DB Price ${dbProduct.price}`);
+                return {
+                    ...item,
+                    price: Number(dbProduct.price), // OVERWRITE with Trusted Price
+                    name: dbProduct.name // OVERWRITE with Trusted Name
+                };
+            }
+            // Pass through discounts (negative price) or custom items not in DB
+            return item;
+        });
+
         // Helper to parse price
         const parsePrice = (p: any) => {
             if (typeof p === 'number') return p;
@@ -46,14 +82,14 @@ serve(async (req) => {
             return `+55${numbers}`;
         };
 
-        // 1. Calculate total in cents
-        const totalCents = items.reduce((acc: number, item: any) => {
+        // 3. Calculate total in cents using VALIDATED items
+        const totalCents = validatedItems.reduce((acc: number, item: any) => {
             const price = parsePrice(item.price);
             return acc + Math.round(price * 100);
         }, 0);
 
-        // 2. Format items for InfinitePay
-        const paymentItems = items.map((item: any) => {
+        // 4. Format items for InfinitePay using VALIDATED items
+        const paymentItems = validatedItems.map((item: any) => {
             const price = parsePrice(item.price);
             return {
                 id: String(item.id || 'custom'),

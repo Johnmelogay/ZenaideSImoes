@@ -24,8 +24,16 @@ export default function LandingPage() {
     };
 
     const handlePhoneChange = (e) => {
-        setPhone(formatPhone(e.target.value));
+        const val = formatPhone(e.target.value);
+        setPhone(val);
         setError('');
+
+        // Auto-submit if 11 chars (mobile) or 10 (landline) - clean numbers
+        const clean = val.replace(/\D/g, '');
+        if (clean.length === 11) {
+            // Debounce slightly to allow render
+            setTimeout(() => document.getElementById('btn-continue')?.click(), 500);
+        }
     };
 
     const handlePhoneLookup = async () => {
@@ -46,8 +54,15 @@ export default function LandingPage() {
                 .single();
 
             if (data?.name) {
+                // FRICTIONLESS LOGIN: Auto-redirect if user exists
                 setFoundName(data.name);
                 setStep('greeting');
+                setLoading(true);
+
+                // Small delay for UX (so they see "Olá, Nome!") then enter
+                setTimeout(async () => {
+                    await registerCustomer(data.name, cleanPhone);
+                }, 1500);
             } else {
                 setStep('name');
             }
@@ -175,6 +190,7 @@ export default function LandingPage() {
                             {step === 'phone' && (
                                 <button
                                     type="button"
+                                    id="btn-continue"
                                     onClick={handlePhoneLookup}
                                     disabled={checking || phone.replace(/\D/g, '').length < 10}
                                     className="w-full bg-stone-900 text-white py-4 rounded-xl font-bold text-base shadow-lg hover:bg-stone-800 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
