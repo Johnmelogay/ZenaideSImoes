@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "./static/css/main.0ac5dec5.css",
-    "main.js": "./static/js/main.95706fec.js",
-    "static/js/453.4ac5dae5.chunk.js": "./static/js/453.4ac5dae5.chunk.js",
-    "index.html": "./index.html",
-    "main.0ac5dec5.css.map": "./static/css/main.0ac5dec5.css.map",
-    "main.95706fec.js.map": "./static/js/main.95706fec.js.map",
-    "453.4ac5dae5.chunk.js.map": "./static/js/453.4ac5dae5.chunk.js.map"
+    "main.css": "/ZenaideSimoes/static/css/main.0ac5dec5.css",
+    "main.js": "/ZenaideSimoes/static/js/main.599526a3.js",
+    "static/js/453.4ac5dae5.chunk.js": "/ZenaideSimoes/static/js/453.4ac5dae5.chunk.js",
+    "index.html": "/ZenaideSimoes/index.html",
+    "main.0ac5dec5.css.map": "/ZenaideSimoes/static/css/main.0ac5dec5.css.map",
+    "main.599526a3.js.map": "/ZenaideSimoes/static/js/main.599526a3.js.map",
+    "453.4ac5dae5.chunk.js.map": "/ZenaideSimoes/static/js/453.4ac5dae5.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.0ac5dec5.css",
-    "static/js/main.95706fec.js"
+    "static/js/main.599526a3.js"
   ]
 }
