@@ -108,8 +108,9 @@ export default function LandingPage() {
                     <div className="animate-fadeIn">
                         {/* Logo / Brand */}
                         <div className="mb-8">
-                            <div className="flex justify-center mb-6">
-                                <img src="/logo_full.svg" alt="Zenaide Simões" className="h-40 w-auto" />
+                            <div className="flex flex-col items-center justify-center gap-2 mb-6">
+                                <img src="/logoZS.svg" alt="Ícone" className="w-16 h-16 drop-shadow-sm" />
+                                <img src="/logo_full.svg" alt="Zenaide Simões" className="h-32 w-auto" />
                             </div>
                             <p className="text-stone-500 text-sm tracking-widest uppercase">
                                 Joias • Acessórios • Casa

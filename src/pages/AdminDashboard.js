@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
-import { Plus, Trash2, Edit2, LogOut, Image as ImageIcon, Save, X, Download, Upload, Search, Package, AlertTriangle, TrendingUp, ShoppingBag, Grid, ChevronUp, ChevronDown, Layers, Tag, Zap, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit2, LogOut, Image as ImageIcon, Save, X, Download, Upload, Search, Package, AlertTriangle, TrendingUp, ShoppingBag, Grid, ChevronUp, ChevronDown, Layers, Tag, Zap, Settings, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import AdminOrders from '../components/AdminOrders';
@@ -19,12 +19,52 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export default function AdminDashboard() {
-    const [activeTab, setActiveTab] = useState('products'); // 'products' | 'orders' | 'categories' | 'coupons'
+    const [activeTab, setActiveTab] = useState('products');
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [editing, setEditing] = useState(null); // Product being edited (null = mode list)
+    const [editing, setEditing] = useState(null);
+    const [selectedProducts, setSelectedProducts] = useState(new Set());
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+    // Bulk Actions Handlers
+    const handleSelectAll = () => {
+        if (selectedProducts.size === filteredProducts.length) {
+            setSelectedProducts(new Set());
+        } else {
+            setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+        }
+    };
+
+    const handleToggleSelect = (id) => {
+        const newSelected = new Set(selectedProducts);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedProducts(newSelected);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Tem certeza que deseja excluir ${selectedProducts.size} produtos?`)) return;
+
+        setBulkActionLoading(true);
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .in('id', Array.from(selectedProducts));
+
+        if (error) {
+            alert('Erro ao excluir produtos.');
+        } else {
+            setSelectedProducts(new Set());
+            fetchProducts();
+        }
+        setBulkActionLoading(false);
+    };
     const [sortBy, setSortBy] = useState('recent');
     const [stockFilter, setStockFilter] = useState('all');
     const navigate = useNavigate();
@@ -866,27 +906,70 @@ export default function AdminDashboard() {
 
                         {/* Search + Filters Row */}
                         <div className="space-y-2">
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-300" size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por nome ou SKU..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 outline-none"
-                                    />
+                            {/* Search + Filters Row or Context Bar */}
+                            {isSelectionMode ? (
+                                <div className="flex items-center justify-between gap-4 bg-stone-900 text-white p-2 rounded-lg animate-in fade-in slide-in-from-top-2 shadow-lg">
+                                    <div className="flex items-center gap-3 pl-2">
+                                        <button
+                                            onClick={() => { setIsSelectionMode(false); setSelectedProducts(new Set()); }}
+                                            className="text-stone-400 hover:text-white transition-colors"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                        <span className="font-bold text-sm">{selectedProducts.size} selecionados</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleSelectAll}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${selectedProducts.size === filteredProducts.length ? 'bg-white text-stone-900 border-white' : 'border-stone-700 text-stone-300 hover:bg-stone-800'}`}
+                                        >
+                                            {selectedProducts.size === filteredProducts.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                                        </button>
+                                        {selectedProducts.size > 0 && (
+                                            <button
+                                                onClick={handleBulkDelete}
+                                                disabled={bulkActionLoading}
+                                                className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
+                                            >
+                                                {bulkActionLoading ? <span className="animate-spin">⏳</span> : <Trash2 size={18} />}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        resetForm();
-                                        setEditing({});
-                                    }}
-                                    className="bg-stone-900 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-stone-800 transition-colors whitespace-nowrap"
-                                >
-                                    <Plus size={16} /> Novo
-                                </button>
-                            </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-300" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar por nome ou SKU..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {filteredProducts.length > 0 && (
+                                            <button
+                                                onClick={() => setIsSelectionMode(true)}
+                                                className="bg-white text-stone-600 border border-stone-200 hover:bg-stone-50 px-3 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 transition-all whitespace-nowrap"
+                                            >
+                                                <Check size={16} className="opacity-60" />
+                                                Selecionar
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                resetForm();
+                                                setEditing({});
+                                            }}
+                                            className="bg-stone-900 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-stone-800 transition-colors whitespace-nowrap"
+                                        >
+                                            <Plus size={16} /> Novo
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Pro Filters */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar">
@@ -933,12 +1016,32 @@ export default function AdminDashboard() {
                             <p className="text-[11px] text-stone-400">{filteredProducts.length} de {products.length} produtos</p>
                         </div>
 
+
+
                         {/* LIST */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                             {filteredProducts.map(product => (
-                                <div key={product.id} className="bg-white p-3 md:p-4 rounded-xl border border-stone-100 flex gap-3 md:gap-4 items-start hover:shadow-md transition-shadow relative group">
+                                <div
+                                    key={product.id}
+                                    className={`bg-white p-3 md:p-4 rounded-xl border ${selectedProducts.has(product.id) ? 'border-amber-500 ring-1 ring-amber-500 bg-amber-50/10' : 'border-stone-100'} flex gap-3 md:gap-4 items-start hover:shadow-md transition-all relative group cursor-pointer`}
+                                    onClick={(e) => {
+                                        if (e.target.closest('button')) return;
+                                        if (isSelectionMode) {
+                                            handleToggleSelect(product.id);
+                                        } else {
+                                            handleEdit(product);
+                                        }
+                                    }}
+                                >
+                                    {/* Selection Checkbox (Visible in mode or if selected) */}
+                                    <div className={`absolute top-3 left-3 z-10 ${isSelectionMode || selectedProducts.has(product.id) ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}>
+                                        <div className={`w-5 h-5 rounded border ${selectedProducts.has(product.id) ? 'bg-amber-500 border-amber-500' : 'bg-white/90 border-stone-300 backdrop-blur-sm'} flex items-center justify-center shadow-sm`}>
+                                            {selectedProducts.has(product.id) && <Check size={12} className="text-white" />}
+                                        </div>
+                                    </div>
+
                                     <img src={product.image_url} alt={product.name} className="w-16 h-16 md:w-20 md:h-20 rounded-lg object-cover bg-stone-100" />
-                                    <div className="flex-1 min-w-0">
+                                    <div className="flex-1 min-w-0 pl-2"> {/* Added pl-2 to make space for checkbox if needed, though absolute positioning handles it */}
                                         <h3 className="font-bold text-stone-800 line-clamp-1 text-sm">{product.name}</h3>
                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                                             {product.sku && (
