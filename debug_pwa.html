@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Debugger</title>
+    <style>
+        body {
+            font-family: system-ui;
+            padding: 20px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>PWA Debugger</h1>
+    <p><strong>Current URL:</strong> <span id="url"></span></p>
+    <p><strong>Manifest Link in DOM:</strong> <span id="manifest-link">Checking...</span></p>
+
+    <h2>Fetch Test</h2>
+    <p>Fetching <code>/ZenaideSImoes/manifest.json</code>: <span id="fetch-main">...</span></p>
+    <p>Fetching <code>/ZenaideSImoes/admin-manifest.json</code>: <span id="fetch-admin">...</span></p>
+
+    <script>
+        document.getElementById('url').textContent = window.location.href;
+
+        // Check DOM
+        const link = document.querySelector('link[rel="manifest"]');
+        document.getElementById('manifest-link').textContent = link ? link.href : 'None found';
+
+        // Fetch checks
+        fetch('/ZenaideSImoes/manifest.json')
+            .then(res => {
+                document.getElementById('fetch-main').textContent = res.status + ' ' + res.statusText;
+                return res.text();
+            })
+            .then(text => {
+                const json = JSON.parse(text);
+                document.getElementById('fetch-main').innerHTML += '<br>start_url: ' + json.start_url;
+            })
+            .catch(err => document.getElementById('fetch-main').textContent = 'Error: ' + err.message);
+
+        fetch('/ZenaideSImoes/admin-manifest.json')
+            .then(res => {
+                document.getElementById('fetch-admin').textContent = res.status + ' ' + res.statusText;
+                return res.text();
+            })
+            .then(text => {
+                const json = JSON.parse(text);
+                document.getElementById('fetch-admin').innerHTML += '<br>start_url: ' + json.start_url;
+            })
+            .catch(err => document.getElementById('fetch-admin').textContent = 'Error: ' + err.message);
+    </script>
+</body>
+
+</html>
