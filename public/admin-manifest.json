@@ -18,8 +18,8 @@
             "sizes": "512x512"
         }
     ],
-    "start_url": "./?admin",
-    "scope": "./",
+    "start_url": "/ZenaideSImoes/?admin",
+    "scope": "/ZenaideSImoes/",
     "display": "standalone",
     "theme_color": "#292524",
     "background_color": "#fafaf9"
