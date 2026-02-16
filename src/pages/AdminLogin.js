@@ -32,7 +32,7 @@ export default function AdminLogin() {
         <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-stone-100">
                 <div className="flex justify-center mb-6">
-                    <img src="/logo_full.svg" alt="Zenaide Simões" className="h-28 w-auto" />
+                    <img src={`${process.env.PUBLIC_URL}/logo_full.svg`} alt="Zenaide Simões" className="h-28 w-auto" />
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-4">

@@ -141,7 +141,7 @@ export default function AdminDashboard() {
         if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('Zenaide Simões 💎', {
                 body: `${count} novo${count > 1 ? 's' : ''} pedido${count > 1 ? 's' : ''} pago${count > 1 ? 's' : ''}!`,
-                icon: '/logo192.png',
+                icon: process.env.PUBLIC_URL + '/logo192.png',
                 tag: 'new-order',
                 renotify: true
             });

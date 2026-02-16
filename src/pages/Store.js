@@ -1513,7 +1513,7 @@ export default function Store() {
             <aside className="hidden md:flex flex-col w-72 bg-white h-screen sticky top-0 border-r border-stone-200 z-30">
                 <div className="p-8 pb-4">
                     {/* Logo instead of Text */}
-                    <img src="/logo_full.svg" alt="Zenaide Simões" className="h-32 w-auto -my-4" />
+                    <img src={`${process.env.PUBLIC_URL}/logo_full.svg`} alt="Zenaide Simões" className="h-32 w-auto -my-4" />
                     <p className="text-xs text-stone-400 mt-1 uppercase tracking-widest font-medium">Joias & Semijoias</p>
                 </div>
 
