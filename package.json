@@ -1,7 +1,7 @@
 {
   "name": "zenaide-simoes",
   "version": "0.1.0",
-  "homepage": "https://johnmelogay.github.io/ZenaideSimoes",
+  "homepage": "https://johnmelogay.github.io/ZenaideSImoes",
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
