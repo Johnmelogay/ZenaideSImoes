@@ -14,8 +14,8 @@ const adminPath = path.join(buildDir, 'admin.html');
 
 let html = fs.readFileSync(indexPath, 'utf8');
 
-// 1. Swap manifest (handle absolute path from homepage config)
-html = html.replace(/href="\/.*\/manifest.json"/, 'href="/ZenaideSImoes/admin-manifest.json"');
+// 1. Swap manifest (handle absolute path, non-greedy)
+html = html.replace(/href="\/[^"]*\/manifest.json"/, 'href="/ZenaideSImoes/admin-manifest.json"');
 
 // 2. Change title
 html = html.replace('<title>Zenaide Simoes</title>', '<title>Admin - Zenaide Simões</title>');
