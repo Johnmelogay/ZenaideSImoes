@@ -23,11 +23,22 @@ export default function AdminDashboard() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(null);
+    const [bannerConfig, setBannerConfig] = useState({
+        active: false,
+        text: 'Frete Grátis nas compras acima de R$ 300!',
+        bg_color: '#f59e0b',
+        text_color: '#ffffff',
+        link: ''
+    });
+    const [savingBanner, setSavingBanner] = useState(false);
     const [selectedProducts, setSelectedProducts] = useState(new Set());
     const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+    const [bulkEditField, setBulkEditField] = useState('category');
+    const [bulkEditValue, setBulkEditValue] = useState('');
 
     // Bulk Actions Handlers
     const handleSelectAll = () => {
@@ -65,6 +76,44 @@ export default function AdminDashboard() {
         }
         setBulkActionLoading(false);
     };
+
+    const handleApplyBulkEdit = async () => {
+        if (!bulkEditField) return;
+        if (!window.confirm(`Tem certeza que deseja alterar o campo "${bulkEditField}" para "${bulkEditValue}" em ${selectedProducts.size} produtos?`)) return;
+
+        setBulkActionLoading(true);
+        try {
+            let processedValue = bulkEditValue;
+            if (bulkEditField === 'price') {
+                processedValue = parseFloat(String(bulkEditValue).replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+            } else if (bulkEditField === 'stock_quantity') {
+                processedValue = parseInt(bulkEditValue) || 0;
+            } else if (bulkEditField === 'is_visible' || bulkEditField === 'is_new') {
+                processedValue = bulkEditValue === 'true';
+            } else if (bulkEditField === 'images') {
+                processedValue = bulkEditValue.split(',').map(url => url.trim()).filter(Boolean);
+            }
+
+            const { error } = await supabase
+                .from('products')
+                .update({ [bulkEditField]: processedValue })
+                .in('id', Array.from(selectedProducts));
+
+            if (error) throw error;
+
+            alert('Produtos atualizados com sucesso!');
+            setSelectedProducts(new Set());
+            setIsSelectionMode(false);
+            setShowBulkEditModal(false);
+            setBulkEditValue('');
+            fetchProducts();
+        } catch (error) {
+            alert('Erro ao atualizar: ' + error.message);
+        } finally {
+            setBulkActionLoading(false);
+        }
+    };
+
     const [sortBy, setSortBy] = useState('recent');
     const [stockFilter, setStockFilter] = useState('all');
     const navigate = useNavigate();
@@ -79,6 +128,7 @@ export default function AdminDashboard() {
         images: [],
         stock_quantity: 0,
         is_new: false,
+        is_visible: true,
         sku: ''
     });
 
@@ -180,7 +230,7 @@ export default function AdminDashboard() {
 
     // Enable push — triggered by user gesture (button tap)
     const handleEnablePush = async () => {
-        const VAPID_PUBLIC = 'BHnaISi2YoHc8LdFKlfDYmDV1_gIFPTHUghliRkgjS7SFK6VyXHepPXGFW6MGFEcOj2Vr_4g7TUDztyh1JWPmp8';
+        const VAPID_PUBLIC = 'BDI9BJDeVw_r25oXUpkMj1awF6UJegvkqTNzLGqJ8b6rVRZ_KiQt2yjQzWwNYMIaUM8gZKpOAgpkAqQw6QW9MTk';
         try {
             if (!('PushManager' in window)) {
                 alert('Push não suportado neste navegador. Adicione o site à Tela Inicio primeiro!');
@@ -367,15 +417,33 @@ export default function AdminDashboard() {
 
     const fetchProducts = async () => {
         try {
+            setLoading(true);
             const { data, error } = await supabase
                 .from('products')
                 .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setProducts(data);
+            setProducts(data || []);
+
+            // Also fetch categories while we're here
+            const { data: catData } = await supabase.from('categories').select('*').order('display_order', { ascending: true });
+            if (catData) setCategories(catData);
+
+            // Fetch Banner Config
+            const { data: bannerData } = await supabase.from('store_settings').select('*').eq('id', 1).single();
+            if (bannerData) {
+                setBannerConfig({
+                    active: bannerData.banner_active,
+                    text: bannerData.banner_text,
+                    bg_color: bannerData.banner_bg_color,
+                    text_color: bannerData.banner_text_color,
+                    link: bannerData.banner_link
+                });
+            }
+
         } catch (error) {
-            console.error('Error fetching products:', error);
+            alert('Erro ao carregar dados: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -538,6 +606,7 @@ export default function AdminDashboard() {
             images: [],
             stock_quantity: 0,
             is_new: false,
+            is_visible: true,
             sku: ''
         });
     };
@@ -576,7 +645,27 @@ export default function AdminDashboard() {
     };
 
     // CSV IMPORT
-    const handleImportCSV = (e) => {
+    const handleSaveBanner = async () => {
+        try {
+            setSavingBanner(true);
+            const { error } = await supabase.from('store_settings').update({
+                banner_active: bannerConfig.active,
+                banner_text: bannerConfig.text,
+                banner_bg_color: bannerConfig.bg_color,
+                banner_text_color: bannerConfig.text_color,
+                banner_link: bannerConfig.link
+            }).eq('id', 1);
+
+            if (error) throw error;
+            alert('Configurações do banner salvas com sucesso!');
+        } catch (err) {
+            alert('Erro ao salvar banner: ' + err.message);
+        } finally {
+            setSavingBanner(false);
+        }
+    };
+
+    const handleImportCSV = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -604,7 +693,8 @@ export default function AdminDashboard() {
                         description: p.Descricao,
                         image_url: p.ImagemPrincipal,
                         images: p.ImagensExtras ? p.ImagensExtras.split(',') : [],
-                        is_new: p.Novo === 'Sim'
+                        is_new: p.Novo === 'Sim',
+                        is_visible: true // Default to visible on import
                     }));
 
                     const { error } = await supabase.from('products').insert(formattedData);
@@ -729,6 +819,110 @@ export default function AdminDashboard() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Banner Config Section */}
+                        <div className="bg-white rounded-xl border border-stone-100 p-4 xl:p-6 space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-stone-800 tracking-wide">Banner Promocional da Loja</h3>
+                                <label className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={bannerConfig.active}
+                                            onChange={e => setBannerConfig({ ...bannerConfig, active: e.target.checked })}
+                                        />
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${bannerConfig.active ? 'bg-amber-500' : 'bg-stone-300'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${bannerConfig.active ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                    <span className="ml-3 text-sm font-bold text-stone-600">
+                                        {bannerConfig.active ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div className={`space-y-4 transition-opacity ${!bannerConfig.active ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div>
+                                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">Texto do Banner</label>
+                                    <input
+                                        type="text"
+                                        value={bannerConfig.text}
+                                        onChange={e => setBannerConfig({ ...bannerConfig, text: e.target.value })}
+                                        className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                        placeholder="Ex: Frete Grátis nas compras acima de R$ 300!"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">Link de Destino (Opcional)</label>
+                                        <input
+                                            type="text"
+                                            value={bannerConfig.link}
+                                            onChange={e => setBannerConfig({ ...bannerConfig, link: e.target.value })}
+                                            className="w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                            placeholder="Ex: /colecao-nova"
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">Cor do Fundo</label>
+                                            <div className="flex border border-stone-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-amber-500/20">
+                                                <input
+                                                    type="color"
+                                                    value={bannerConfig.bg_color}
+                                                    onChange={e => setBannerConfig({ ...bannerConfig, bg_color: e.target.value })}
+                                                    className="w-12 h-12 p-1 cursor-pointer bg-white"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={bannerConfig.bg_color}
+                                                    onChange={e => setBannerConfig({ ...bannerConfig, bg_color: e.target.value })}
+                                                    className="flex-1 p-3 outline-none uppercase text-sm font-mono"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">Cor do Texto</label>
+                                            <div className="flex border border-stone-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-amber-500/20">
+                                                <input
+                                                    type="color"
+                                                    value={bannerConfig.text_color}
+                                                    onChange={e => setBannerConfig({ ...bannerConfig, text_color: e.target.value })}
+                                                    className="w-12 h-12 p-1 cursor-pointer bg-white"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={bannerConfig.text_color}
+                                                    onChange={e => setBannerConfig({ ...bannerConfig, text_color: e.target.value })}
+                                                    className="flex-1 p-3 outline-none uppercase text-sm font-mono"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-2">Pré-visualização</label>
+                                    <div
+                                        className="w-full py-2.5 px-4 text-center text-sm font-bold truncate rounded-lg"
+                                        style={{ backgroundColor: bannerConfig.bg_color, color: bannerConfig.text_color }}
+                                    >
+                                        {bannerConfig.text || 'Digite o texto do banner...'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleSaveBanner}
+                                    disabled={savingBanner}
+                                    className="px-6 py-2.5 bg-stone-900 text-white font-bold rounded-xl hover:bg-stone-800 transition-colors flex items-center gap-2"
+                                >
+                                    {savingBanner ? 'Salvando...' : <><Save size={16} /> Salvar Banner</>}
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
                 ) : activeTab === 'categories' ? (
                     /* === CATEGORIES MANAGEMENT === */
@@ -926,13 +1120,22 @@ export default function AdminDashboard() {
                                             {selectedProducts.size === filteredProducts.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                                         </button>
                                         {selectedProducts.size > 0 && (
-                                            <button
-                                                onClick={handleBulkDelete}
-                                                disabled={bulkActionLoading}
-                                                className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
-                                            >
-                                                {bulkActionLoading ? <span className="animate-spin">⏳</span> : <Trash2 size={18} />}
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => setShowBulkEditModal(true)}
+                                                    disabled={bulkActionLoading}
+                                                    className="bg-amber-500 text-white p-2 rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Edit2 size={18} /> <span className="text-sm font-bold hidden sm:inline">Editar Lote</span>
+                                                </button>
+                                                <button
+                                                    onClick={handleBulkDelete}
+                                                    disabled={bulkActionLoading}
+                                                    className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
+                                                >
+                                                    {bulkActionLoading ? <span className="animate-spin">⏳</span> : <Trash2 size={18} />}
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -1040,6 +1243,13 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
 
+                                    {/* Visibility Badge */}
+                                    {!product.is_visible && (
+                                        <div className="absolute top-3 left-10 z-10 bg-stone-900/80 backdrop-blur-sm text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+                                            <LogOut size={10} /> Oculto
+                                        </div>
+                                    )}
+
                                     <img src={product.image_url} alt={product.name} className="w-16 h-16 md:w-20 md:h-20 rounded-lg object-cover bg-stone-100" />
                                     <div className="flex-1 min-w-0 pl-2"> {/* Added pl-2 to make space for checkbox if needed, though absolute positioning handles it */}
                                         <h3 className="font-bold text-stone-800 line-clamp-1 text-sm">{product.name}</h3>
@@ -1052,11 +1262,7 @@ export default function AdminDashboard() {
                                                     <span key={cat} className="text-[10px] bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded font-medium">{cat.trim()}</span>
                                                 ))}
                                             </div>
-                                            {(product.stock_quantity || 0) < 3 && (
-                                                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                                                    <AlertTriangle size={8} /> Baixo Estoque
-                                                </span>
-                                            )}
+
                                         </div>
 
                                         <div className="flex justify-between items-end mt-2">
@@ -1240,6 +1446,15 @@ export default function AdminDashboard() {
                                             />
                                             <label className="text-sm font-bold text-stone-700">Novidade?</label>
                                         </div>
+                                        <div className="flex items-center gap-2 pt-6">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.is_visible !== false} // Default true
+                                                onChange={e => setFormData({ ...formData, is_visible: e.target.checked })}
+                                                className="w-5 h-5 accent-green-600"
+                                            />
+                                            <label className="text-sm font-bold text-stone-700">Visível no Site?</label>
+                                        </div>
                                     </div>
 
                                     <div>
@@ -1272,6 +1487,95 @@ export default function AdminDashboard() {
                     </div>
                 )
             }
-        </div>
+
+            {/* Modal de Edição em Massa */}
+            {showBulkEditModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={(e) => {
+                    if (e.target === e.currentTarget) setShowBulkEditModal(false);
+                }}>
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 rounded-t-2xl">
+                            <h2 className="text-lg font-bold text-stone-800">
+                                Edição em Massa
+                            </h2>
+                            <button onClick={() => setShowBulkEditModal(false)} className="text-stone-400 hover:text-stone-600">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <p className="text-sm text-stone-500">Editando {selectedProducts.size} produtos selecionados.</p>
+                            <div>
+                                <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Campo para Alterar</label>
+                                <select
+                                    value={bulkEditField}
+                                    onChange={e => {
+                                        setBulkEditField(e.target.value);
+                                        setBulkEditValue(''); // reset value when field changes
+                                    }}
+                                    className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                >
+                                    <option value="name">Nome do Produto</option>
+                                    <option value="category">Categoria</option>
+                                    <option value="price">Preço</option>
+                                    <option value="stock_quantity">Quantidade em Estoque</option>
+                                    <option value="is_visible">Visibilidade</option>
+                                    <option value="is_new">Status: Novidade</option>
+                                    <option value="sku">SKU</option>
+                                    <option value="description">Descrição</option>
+                                    <option value="image_url">Imagem Principal (URL)</option>
+                                    <option value="images">Imagens Secundárias (URLs separadas por vírgula)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Novo Valor</label>
+                                {bulkEditField === 'is_visible' || bulkEditField === 'is_new' ? (
+                                    <select
+                                        value={bulkEditValue}
+                                        onChange={e => setBulkEditValue(e.target.value)}
+                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                    >
+                                        <option value="" disabled>Selecione...</option>
+                                        <option value="true">{bulkEditField === 'is_visible' ? 'Visível' : 'Sim (Novidade)'}</option>
+                                        <option value="false">{bulkEditField === 'is_visible' ? 'Oculto' : 'Não'}</option>
+                                    </select>
+                                ) : bulkEditField === 'category' ? (
+                                    <select
+                                        value={bulkEditValue}
+                                        onChange={e => setBulkEditValue(e.target.value)}
+                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                    >
+                                        <option value="" disabled>Selecione uma categoria...</option>
+                                        {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                ) : bulkEditField === 'description' ? (
+                                    <textarea
+                                        value={bulkEditValue}
+                                        onChange={e => setBulkEditValue(e.target.value)}
+                                        placeholder="Nova descrição..."
+                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none h-24"
+                                    />
+                                ) : (
+                                    <input
+                                        type={bulkEditField === 'stock_quantity' ? 'number' : 'text'}
+                                        value={bulkEditValue}
+                                        onChange={e => setBulkEditValue(e.target.value)}
+                                        placeholder={bulkEditField === 'price' ? 'Ex: 199,90' : 'Novo valor'}
+                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                    />
+                                )}
+                            </div>
+                            <button
+                                onClick={handleApplyBulkEdit}
+                                disabled={bulkActionLoading || bulkEditValue === ''}
+                                className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {bulkActionLoading ? 'Aplicando...' : 'Aplicar Alteração'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )
+            }
+        </div >
     );
 }

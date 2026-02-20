@@ -53,6 +53,17 @@ Deno.serve(async (req) => {
         // Deep link with correct casing
         const deepLink = `https://johnmelogay.github.io/ZenaideSImoes/#/produto/${productId}`;
 
+
+        // Detect User-Agent to differentiate between bots (WhatsApp/Facebook) and real users
+        const userAgent = req.headers.get('user-agent') || '';
+        const isBot = /facebookexternalhit|WhatsApp|Twitterbot|TelegramBot|Discordbot|LinkedInBot|Slackbot|SkypeUriPreview|Applebot/i.test(userAgent);
+
+        // If it's a real user, redirect immediately (302) to avoid showing raw HTML
+        if (!isBot) {
+            return Response.redirect(deepLink, 302);
+        }
+
+        // If it's a bot, serve the HTML with Open Graph tags for preview
         const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -80,7 +91,6 @@ Deno.serve(async (req) => {
 </head>
 <body>
   <p>Redirecionando para <a href="${deepLink}">${product.name}</a>...</p>
-  <script>window.location.href = "${deepLink}";</script>
 </body>
 </html>`;
 

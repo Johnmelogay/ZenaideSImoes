@@ -89,7 +89,7 @@ serve(async (req) => {
         }, 0);
 
         // 4. Format items for InfinitePay using VALIDATED items
-        const paymentItems = validatedItems.map((item: any) => {
+        let paymentItems = validatedItems.map((item: any) => {
             const price = parsePrice(item.price);
             return {
                 id: String(item.id || 'custom'),
@@ -98,6 +98,18 @@ serve(async (req) => {
                 quantity: 1
             };
         });
+
+        // 4.1 Check for negative prices (Discounts) which break many APIs
+        const hasNegativePrice = paymentItems.some((i: any) => i.price < 0);
+        if (hasNegativePrice) {
+            console.log("Found negative price item (Discount). Collapsing items to single summary to prevent API error.");
+            paymentItems = [{
+                id: 'summary',
+                description: `Pedido #${order_id.slice(0, 8)} (com descontos)`,
+                price: totalCents, // The final calculated total including discount
+                quantity: 1
+            }];
+        }
 
         // Determine Redirect URL
         // HARDCODED FIX: Correct GitHub Pages path (case-sensitive!)
