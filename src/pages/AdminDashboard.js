@@ -143,8 +143,6 @@ export default function AdminDashboard() {
         const stock = Number(p.stock_quantity) || 0;
         return acc + (price * stock);
     }, 0);
-    const lowStockCount = products.filter(p => (Number(p.stock_quantity) || 0) < 3).length;
-
     // Categories state
     const [categories, setCategories] = useState([]);
     const [catLoading, setCatLoading] = useState(false);
@@ -715,9 +713,7 @@ export default function AdminDashboard() {
         const term = searchTerm.toLowerCase();
         const matchesSearch = p.name.toLowerCase().includes(term) || (p.sku && p.sku.toLowerCase().includes(term));
         const matchesCategory = filterCategory ? (p.category || '').split(',').map(c => c.trim()).includes(filterCategory) : true;
-        const matchesStock = stockFilter === 'low' ? (Number(p.stock_quantity) || 0) < 3
-            : stockFilter === 'instock' ? (Number(p.stock_quantity) || 0) >= 3
-                : true;
+        const matchesStock = stockFilter === 'instock' ? (Number(p.stock_quantity) || 0) > 0 : true;
         return matchesSearch && matchesCategory && matchesStock;
     }).sort((a, b) => {
         switch (sortBy) {
@@ -1090,12 +1086,6 @@ export default function AdminDashboard() {
                                 <span className="text-stone-500">Estoque</span>
                                 <span className="font-bold text-stone-800">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                             </span>
-                            {lowStockCount > 0 && (
-                                <span className="inline-flex items-center gap-1.5 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 text-xs">
-                                    <AlertTriangle size={13} className="text-red-500" />
-                                    <span className="text-red-600 font-bold">{lowStockCount} baixo</span>
-                                </span>
-                            )}
                         </div>
 
                         {/* Search + Filters Row */}
@@ -1203,7 +1193,6 @@ export default function AdminDashboard() {
                                     className="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-600 outline-none min-w-0 appearance-none cursor-pointer"
                                 >
                                     <option value="all">Todo estoque</option>
-                                    <option value="low">Estoque baixo</option>
                                     <option value="instock">Em estoque</option>
                                 </select>
                                 {(filterCategory || stockFilter !== 'all' || sortBy !== 'recent') && (
@@ -1489,92 +1478,93 @@ export default function AdminDashboard() {
             }
 
             {/* Modal de Edição em Massa */}
-            {showBulkEditModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={(e) => {
-                    if (e.target === e.currentTarget) setShowBulkEditModal(false);
-                }}>
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 rounded-t-2xl">
-                            <h2 className="text-lg font-bold text-stone-800">
-                                Edição em Massa
-                            </h2>
-                            <button onClick={() => setShowBulkEditModal(false)} className="text-stone-400 hover:text-stone-600">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            <p className="text-sm text-stone-500">Editando {selectedProducts.size} produtos selecionados.</p>
-                            <div>
-                                <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Campo para Alterar</label>
-                                <select
-                                    value={bulkEditField}
-                                    onChange={e => {
-                                        setBulkEditField(e.target.value);
-                                        setBulkEditValue(''); // reset value when field changes
-                                    }}
-                                    className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+            {
+                showBulkEditModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowBulkEditModal(false);
+                    }}>
+                        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="p-5 border-b border-stone-100 flex justify-between items-center bg-stone-50 rounded-t-2xl">
+                                <h2 className="text-lg font-bold text-stone-800">
+                                    Edição em Massa
+                                </h2>
+                                <button onClick={() => setShowBulkEditModal(false)} className="text-stone-400 hover:text-stone-600">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-5 space-y-4">
+                                <p className="text-sm text-stone-500">Editando {selectedProducts.size} produtos selecionados.</p>
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Campo para Alterar</label>
+                                    <select
+                                        value={bulkEditField}
+                                        onChange={e => {
+                                            setBulkEditField(e.target.value);
+                                            setBulkEditValue(''); // reset value when field changes
+                                        }}
+                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                    >
+                                        <option value="name">Nome do Produto</option>
+                                        <option value="category">Categoria</option>
+                                        <option value="price">Preço</option>
+                                        <option value="stock_quantity">Quantidade em Estoque</option>
+                                        <option value="is_visible">Visibilidade</option>
+                                        <option value="is_new">Status: Novidade</option>
+                                        <option value="sku">SKU</option>
+                                        <option value="description">Descrição</option>
+                                        <option value="image_url">Imagem Principal (URL)</option>
+                                        <option value="images">Imagens Secundárias (URLs separadas por vírgula)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Novo Valor</label>
+                                    {bulkEditField === 'is_visible' || bulkEditField === 'is_new' ? (
+                                        <select
+                                            value={bulkEditValue}
+                                            onChange={e => setBulkEditValue(e.target.value)}
+                                            className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                        >
+                                            <option value="" disabled>Selecione...</option>
+                                            <option value="true">{bulkEditField === 'is_visible' ? 'Visível' : 'Sim (Novidade)'}</option>
+                                            <option value="false">{bulkEditField === 'is_visible' ? 'Oculto' : 'Não'}</option>
+                                        </select>
+                                    ) : bulkEditField === 'category' ? (
+                                        <select
+                                            value={bulkEditValue}
+                                            onChange={e => setBulkEditValue(e.target.value)}
+                                            className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                        >
+                                            <option value="" disabled>Selecione uma categoria...</option>
+                                            {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    ) : bulkEditField === 'description' ? (
+                                        <textarea
+                                            value={bulkEditValue}
+                                            onChange={e => setBulkEditValue(e.target.value)}
+                                            placeholder="Nova descrição..."
+                                            className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none h-24"
+                                        />
+                                    ) : (
+                                        <input
+                                            type={bulkEditField === 'stock_quantity' ? 'number' : 'text'}
+                                            value={bulkEditValue}
+                                            onChange={e => setBulkEditValue(e.target.value)}
+                                            placeholder={bulkEditField === 'price' ? 'Ex: 199,90' : 'Novo valor'}
+                                            className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                        />
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleApplyBulkEdit}
+                                    disabled={bulkActionLoading || bulkEditValue === ''}
+                                    className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <option value="name">Nome do Produto</option>
-                                    <option value="category">Categoria</option>
-                                    <option value="price">Preço</option>
-                                    <option value="stock_quantity">Quantidade em Estoque</option>
-                                    <option value="is_visible">Visibilidade</option>
-                                    <option value="is_new">Status: Novidade</option>
-                                    <option value="sku">SKU</option>
-                                    <option value="description">Descrição</option>
-                                    <option value="image_url">Imagem Principal (URL)</option>
-                                    <option value="images">Imagens Secundárias (URLs separadas por vírgula)</option>
-                                </select>
+                                    {bulkActionLoading ? 'Aplicando...' : 'Aplicar Alteração'}
+                                </button>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Novo Valor</label>
-                                {bulkEditField === 'is_visible' || bulkEditField === 'is_new' ? (
-                                    <select
-                                        value={bulkEditValue}
-                                        onChange={e => setBulkEditValue(e.target.value)}
-                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
-                                    >
-                                        <option value="" disabled>Selecione...</option>
-                                        <option value="true">{bulkEditField === 'is_visible' ? 'Visível' : 'Sim (Novidade)'}</option>
-                                        <option value="false">{bulkEditField === 'is_visible' ? 'Oculto' : 'Não'}</option>
-                                    </select>
-                                ) : bulkEditField === 'category' ? (
-                                    <select
-                                        value={bulkEditValue}
-                                        onChange={e => setBulkEditValue(e.target.value)}
-                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none"
-                                    >
-                                        <option value="" disabled>Selecione uma categoria...</option>
-                                        {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                ) : bulkEditField === 'description' ? (
-                                    <textarea
-                                        value={bulkEditValue}
-                                        onChange={e => setBulkEditValue(e.target.value)}
-                                        placeholder="Nova descrição..."
-                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none h-24"
-                                    />
-                                ) : (
-                                    <input
-                                        type={bulkEditField === 'stock_quantity' ? 'number' : 'text'}
-                                        value={bulkEditValue}
-                                        onChange={e => setBulkEditValue(e.target.value)}
-                                        placeholder={bulkEditField === 'price' ? 'Ex: 199,90' : 'Novo valor'}
-                                        className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 outline-none"
-                                    />
-                                )}
-                            </div>
-                            <button
-                                onClick={handleApplyBulkEdit}
-                                disabled={bulkActionLoading || bulkEditValue === ''}
-                                className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {bulkActionLoading ? 'Aplicando...' : 'Aplicar Alteração'}
-                            </button>
                         </div>
                     </div>
-                </div>
-            )
+                )
             }
         </div >
     );
