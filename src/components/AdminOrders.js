@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getOptimizedImageUrl, imagePresets } from '../services/supabase';
 import { Search, Filter, MessageCircle, Package, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, Copy, ExternalLink, Save, X } from 'lucide-react';
 
 export default function AdminOrders() {
@@ -225,7 +225,7 @@ export default function AdminOrders() {
                                                     <div key={idx} className="flex gap-3 md:gap-4 items-center bg-stone-50 p-2 md:p-3 rounded-xl border border-stone-100">
                                                         <div
                                                             className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-lg bg-cover bg-center cursor-zoom-in border border-stone-200 shadow-sm"
-                                                            style={{ backgroundImage: `url(${item.image || item.image_url || item.images?.[0]})` }}
+                                                            style={{ backgroundImage: `url(${getOptimizedImageUrl(item.image || item.image_url || item.images?.[0], imagePresets.small)})` }}
                                                             onClick={() => setZoomedImage(item.image || item.image_url || item.images?.[0])}
                                                         ></div>
                                                         <div className="flex-1">

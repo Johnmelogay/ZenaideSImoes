@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ShoppingBag, Home, Heart, Search, User, Plus, Minus, Check, MessageCircle, X, ChevronRight, Package, LogOut, Sparkles, Crown, ChevronDown, CreditCard, Tag, Ticket, Lock, Edit3, Share2, AlertTriangle, SlidersHorizontal, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase, getOptimizedImageUrl, imagePresets } from '../services/supabase';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -188,8 +188,10 @@ const ProductCard = ({ product, onAdd, isAdded, onClick, onFav, isFav }) => (
     >
         <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-stone-100 isolate">
             <img
-                src={product.image_url || product.image}
+                src={getOptimizedImageUrl(product.image_url || product.image, imagePresets.thumbnail)}
                 alt={product.name}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-105"
             />
 
@@ -273,7 +275,7 @@ const CartDrawer = ({ isOpen, onClose, items, onUpdateQty, onRemove, onCheckout,
                     ) : (
                         items.map((item, idx) => (
                             <div key={item.id} className="flex gap-4 items-start bg-white border border-stone-100 p-3 rounded-2xl hover:border-amber-100 hover:shadow-sm transition-all">
-                                <img src={item.image_url || item.image} alt={item.name} className="w-20 h-20 rounded-xl object-cover bg-stone-50 flex-shrink-0" />
+                                <img src={getOptimizedImageUrl(item.image_url || item.image, imagePresets.small)} alt={item.name} loading="lazy" decoding="async" className="w-20 h-20 rounded-xl object-cover bg-stone-50 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold text-stone-800 line-clamp-2 mb-1">{item.name}</p>
                                     <p className="text-sm font-bold text-stone-900 mb-2">R$ {(Number(item.price) * (item.qty || 1)).toFixed(2)}</p>
@@ -436,7 +438,7 @@ const ProductDetails = ({ product, isOpen, onClose, onAdd }) => {
                     >
                         {images.map((img, idx) => (
                             <SwiperSlide key={idx} onClick={() => setFullscreenImage(img)} className="cursor-zoom-in">
-                                <img src={img} alt={`View ${idx}`} className="w-full h-full object-cover" />
+                                <img src={getOptimizedImageUrl(img, imagePresets.medium)} alt={`View ${idx}`} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                             </SwiperSlide>
                         ))}
                     </Swiper>
@@ -1304,8 +1306,32 @@ export default function Store() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const { data: pData } = await supabase.from('products').select('*').eq('is_visible', true).order('created_at', { ascending: false });
-            if (pData) setProducts(pData);
+
+            // Supabase PostgREST limits responses to 1000 rows by default.
+            // Paginate to fetch ALL visible products.
+            const PAGE_SIZE = 1000;
+            let allProducts = [];
+            let from = 0;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data: pData } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('is_visible', true)
+                    .order('created_at', { ascending: false })
+                    .range(from, from + PAGE_SIZE - 1);
+
+                if (pData && pData.length > 0) {
+                    allProducts = allProducts.concat(pData);
+                    from += PAGE_SIZE;
+                    if (pData.length < PAGE_SIZE) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            setProducts(allProducts);
 
             const { data: cData } = await supabase.from('categories').select('*').order('display_order', { ascending: true });
             if (cData) setStoreCategories([{ id: 'all', name: 'Todas As Joias' }, ...cData]);
@@ -1322,8 +1348,8 @@ export default function Store() {
             }
 
             // Auto-open product from URL if navigated via /produto/:id
-            if (urlProductId && pData) {
-                const found = pData.find(p => String(p.id) === String(urlProductId));
+            if (urlProductId && allProducts.length > 0) {
+                const found = allProducts.find(p => String(p.id) === String(urlProductId));
                 if (found) {
                     setSelectedProduct(found);
                     // Clean URL so refreshing doesn't re-open
@@ -1814,7 +1840,7 @@ export default function Store() {
                                                     <div className="space-y-3 mb-4">
                                                         {order.items?.map((item, idx) => (
                                                             <div key={idx} className="flex gap-3 items-center bg-white p-2 rounded-lg border border-stone-100">
-                                                                <div className="w-12 h-12 bg-stone-100 rounded-md bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${item.image || item.image_url || item.images?.[0]})` }}></div>
+                                                                <div className="w-12 h-12 bg-stone-100 rounded-md bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${getOptimizedImageUrl(item.image || item.image_url || item.images?.[0], imagePresets.small)})` }}></div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <p className="text-sm font-medium text-stone-800 line-clamp-1">{item.name}</p>
                                                                     <p className="text-xs text-stone-500">R$ {Number(item.price).toFixed(2)} x {item.qty || 1}</p>

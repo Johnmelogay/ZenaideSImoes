@@ -416,13 +416,34 @@ export default function AdminDashboard() {
     const fetchProducts = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('products')
-                .select('*')
-                .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setProducts(data || []);
+            // Supabase PostgREST limits responses to 1000 rows by default.
+            // We paginate to fetch ALL products.
+            const PAGE_SIZE = 1000;
+            let allProducts = [];
+            let from = 0;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(from, from + PAGE_SIZE - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allProducts = allProducts.concat(data);
+                    from += PAGE_SIZE;
+                    // If we got fewer than PAGE_SIZE, we've fetched everything
+                    if (data.length < PAGE_SIZE) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            setProducts(allProducts);
 
             // Also fetch categories while we're here
             const { data: catData } = await supabase.from('categories').select('*').order('display_order', { ascending: true });
@@ -457,7 +478,7 @@ export default function AdminDashboard() {
                 img.src = event.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 1200; // Limit max width for performance/size
+                    const MAX_WIDTH = 800; // Reduced for faster loading — sufficient for product display
                     let width = img.width;
                     let height = img.height;
 
@@ -483,7 +504,7 @@ export default function AdminDashboard() {
                             lastModified: Date.now(),
                         });
                         resolve(newFile);
-                    }, 'image/webp', 0.85); // 85% Quality - Great balance
+                    }, 'image/webp', 0.60); // 60% Quality — optimized for fast loading
                 };
                 img.onerror = (error) => reject(error);
             };
