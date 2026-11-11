@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/ZenaideSImoes/static/css/main.56dc8760.css",
-    "main.js": "/ZenaideSImoes/static/js/main.fd999f6c.js",
+    "main.css": "/ZenaideSImoes/static/css/main.c1b11222.css",
+    "main.js": "/ZenaideSImoes/static/js/main.49103d9d.js",
     "static/js/453.4ac5dae5.chunk.js": "/ZenaideSImoes/static/js/453.4ac5dae5.chunk.js",
     "index.html": "/ZenaideSImoes/index.html",
-    "main.56dc8760.css.map": "/ZenaideSImoes/static/css/main.56dc8760.css.map",
-    "main.fd999f6c.js.map": "/ZenaideSImoes/static/js/main.fd999f6c.js.map",
+    "main.c1b11222.css.map": "/ZenaideSImoes/static/css/main.c1b11222.css.map",
+    "main.49103d9d.js.map": "/ZenaideSImoes/static/js/main.49103d9d.js.map",
     "453.4ac5dae5.chunk.js.map": "/ZenaideSImoes/static/js/453.4ac5dae5.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.56dc8760.css",
-    "static/js/main.fd999f6c.js"
+    "static/css/main.c1b11222.css",
+    "static/js/main.49103d9d.js"
   ]
 }
