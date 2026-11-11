@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabase';
 import { CustomerProvider, useCustomer } from './contexts/CustomerContext';
+import ClarityConsent from './components/ClarityConsent';
 
 // Pages
 import Store from './pages/Store';
@@ -98,20 +99,22 @@ export default function App() {
     <CustomerProvider>
       <PaymentRedirectHandler />
       <HashRouter>
-        <Routes>
-          <Route path="/" element={<HomeRoute />} />
-          <Route path="/produto/:productId" element={<HomeRoute />} />
-          <Route path="/sucesso" element={<Success />} />
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+        <ClarityConsent>
+          <Routes>
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/produto/:productId" element={<HomeRoute />} />
+            <Route path="/sucesso" element={<Success />} />
+            <Route path="/admin" element={<AdminLogin />} />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </ClarityConsent>
       </HashRouter>
     </CustomerProvider>
   );

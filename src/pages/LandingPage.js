@@ -147,7 +147,7 @@ export default function LandingPage() {
                     </div>
                 ) : (
                     /* ============ REGISTRATION FORM ============ */
-                    <div className="animate-fadeIn">
+                    <div className="animate-fadeIn" data-clarity-mask="True">
                         <div className="mb-8">
                             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
                                 <Heart size={32} className="text-white" />

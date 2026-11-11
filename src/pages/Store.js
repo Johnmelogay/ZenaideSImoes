@@ -848,7 +848,7 @@ CEP: ${form.cep}`;
     };
 
     return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" data-clarity-mask="True">
             <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
             <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
@@ -1078,7 +1078,7 @@ const AuthGateModal = ({ isOpen, onClose, onSuccess, customer, verifyPasscode, c
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" data-clarity-mask="True">
             <div className="absolute inset-0 bg-stone-900/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 fade-in duration-300">
                 {/* Icon */}
@@ -1566,8 +1566,8 @@ export default function Store() {
                         <button className="p-2 text-stone-400 hover:text-stone-600 transition-colors">
                             <MessageCircle size={22} />
                         </button>
-                        <div className="w-9 h-9 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-full p-[2px]">
-                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(customer?.name || 'Cliente')}&background=fff&color=000`} className="w-full h-full rounded-full border-2 border-white" alt="Profile" />
+                        <div className="w-9 h-9 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-full flex items-center justify-center text-sm font-bold text-white" data-clarity-mask="True" aria-hidden="true">
+                            {customer?.name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                     </div>
                 </header>
@@ -1576,7 +1576,7 @@ export default function Store() {
                 {activeTab === 'home' && (
                     <header className="md:hidden px-5 pb-2 bg-white flex justify-between items-center sticky top-0 z-10 border-b border-stone-50" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 1.5rem))' }}>
                         <div>
-                            <h1 className="text-xl font-serif font-bold text-stone-800">{getGreeting()}</h1>
+                            <h1 className="text-xl font-serif font-bold text-stone-800" data-clarity-mask="True">{getGreeting()}</h1>
                             <p className="text-xs text-stone-500">Seleção especial para você</p>
                         </div>
                         <div className="flex gap-3">
@@ -1786,7 +1786,7 @@ export default function Store() {
 
                         {/* === ORDERS TAB === */}
                         {activeTab === 'orders' && (
-                            <div className="max-w-xl mx-auto">
+                            <div className="max-w-xl mx-auto" data-clarity-mask="True">
                                 <h2 className="font-serif text-2xl font-bold text-stone-800 mb-2">Meus Pedidos 📦</h2>
                                 <p className="text-stone-500 text-sm mb-6">{customer?.name ? `Aqui estão seus pedidos, ${customer.name.split(' ')[0]}.` : 'Seus pedidos aparecem aqui.'}</p>
                                 {ordersLoading ? (
@@ -1899,7 +1899,7 @@ export default function Store() {
 
                         {/* === PROFILE TAB === */}
                         {activeTab === 'profile' && (
-                            <div className="max-w-md mx-auto">
+                            <div className="max-w-md mx-auto" data-clarity-mask="True">
                                 <h2 className="font-serif text-2xl font-bold text-stone-800 mb-6">Meu Perfil</h2>
                                 <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
                                     <div className="flex items-center gap-4">
