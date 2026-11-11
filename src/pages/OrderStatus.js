@@ -65,9 +65,11 @@ export default function OrderStatus() {
 
     return (
         <main className="min-h-screen bg-stone-50 pb-10 text-stone-900">
-            <header className="flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3">
-                <a href={`${process.env.PUBLIC_URL}/`} className="inline-flex min-h-10 items-center gap-2 text-sm font-medium"><ArrowLeft size={17} /> Loja</a>
-                <img src={`${process.env.PUBLIC_URL}/logo_full.svg`} className="h-9 w-auto" alt="Zenaide Simões" />
+            <header className="border-b border-stone-200 bg-white">
+                <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
+                    <a href={`${process.env.PUBLIC_URL}/`} className="inline-flex min-h-10 items-center gap-2 text-sm font-medium"><ArrowLeft size={17} /> Loja</a>
+                    <img src={`${process.env.PUBLIC_URL}/logo_full.svg`} className="h-9 w-auto" alt="Zenaide Simões" />
+                </div>
             </header>
 
             <div className="mx-auto max-w-lg space-y-4 px-4 py-5">

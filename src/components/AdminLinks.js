@@ -15,6 +15,8 @@ export default function AdminLinks() {
     const [settings, setSettings] = useState({ delivery_options: [] });
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [results, setResults] = useState([]);
+    const [rings, setRings] = useState([]);
     const [selected, setSelected] = useState(null);
     const [manual, setManual] = useState(false);
     const [form, setForm] = useState({ title: '', price: '', description: '', image_url: '', sizes: '', stock: '' });
@@ -27,13 +29,18 @@ export default function AdminLinks() {
 
     async function load() {
         setLoading(true);
-        const [{ data: linkRows }, { data: productRows }, { data: config }] = await Promise.all([
+        const [{ data: linkRows }, { data: ringRows }, { data: config }] = await Promise.all([
             supabase.from('sales_links').select('*').order('created_at', { ascending: false }).limit(60),
-            supabase.from('products').select('id, name, category, price, image_url, available_sizes, stock_quantity').eq('is_visible', true).order('created_at', { ascending: false }).limit(400),
+            supabase.from('products')
+                .select('id, name, category, price, image_url, available_sizes, stock_quantity')
+                .eq('is_visible', true)
+                .or('name.ilike.%anel%,name.ilike.%alian%,category.ilike.%anel%')
+                .limit(1000),
             supabase.from('store_settings').select('delivery_options').eq('id', 1).maybeSingle(),
         ]);
         setLinks(linkRows || []);
-        setProducts(productRows || []);
+        setProducts(ringRows || []);
+        setRings(ringRows || []);
         const options = config?.delivery_options || [];
         setSettings({ delivery_options: options });
         setDeliveryDraft(options);
@@ -44,14 +51,23 @@ export default function AdminLinks() {
     useEffect(() => { load(); }, []);
 
     const ringsWithoutSize = useMemo(
-        () => products.filter(product => isRing(product) && !(product.available_sizes || []).length).slice(0, 60),
-        [products]
+        () => rings.filter(product => isRing(product) && !(product.available_sizes || []).length),
+        [rings]
     );
-    const results = useMemo(() => {
-        const term = search.trim().toLowerCase();
-        if (!term) return [];
-        return products.filter(product => product.name?.toLowerCase().includes(term) || String(product.id) === term).slice(0, 8);
-    }, [products, search]);
+
+    useEffect(() => {
+        const term = search.trim();
+        if (term.length < 2 || selected) { setResults([]); return undefined; }
+        const timer = setTimeout(async () => {
+            const { data } = await supabase.from('products')
+                .select('id, name, category, price, image_url, available_sizes, stock_quantity')
+                .eq('is_visible', true)
+                .ilike('name', `%${term}%`)
+                .limit(8);
+            setResults(data || []);
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [search, selected]);
 
     function chooseProduct(product) {
         setSelected(product);
@@ -132,6 +148,7 @@ export default function AdminLinks() {
         const { error } = await supabase.from('products').update({ available_sizes: sizes }).eq('id', product.id);
         if (error) return alert(error.message);
         setProducts(current => current.map(item => item.id === product.id ? { ...item, available_sizes: sizes } : item));
+        setRings(current => current.map(item => item.id === product.id ? { ...item, available_sizes: sizes } : item));
         setSizeDrafts(current => { const next = { ...current }; delete next[product.id]; return next; });
     }
 
