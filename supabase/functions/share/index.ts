@@ -6,6 +6,10 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[char] ?? char));
+
 Deno.serve(async (req) => {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
@@ -16,7 +20,7 @@ Deno.serve(async (req) => {
         const url = new URL(req.url);
         const productId = url.searchParams.get('id');
 
-        if (!productId) {
+        if (!productId || !/^\d{1,15}$/.test(productId)) {
             return new Response("Missing product ID", {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' }
@@ -36,6 +40,7 @@ Deno.serve(async (req) => {
             .from('products')
             .select('*')
             .eq('id', productId)
+            .eq('is_visible', true)
             .single();
 
         if (error || !product) {
@@ -46,9 +51,9 @@ Deno.serve(async (req) => {
         }
 
         // Construct Meta Tags
-        const title = `${product.name} | Zenaide Simões`;
+        const title = escapeHtml(`${product.name} | Zenaide Simões`);
         const description = `R$ ${Number(product.price).toFixed(2)} - Confira esta peça exclusiva!`;
-        const image = product.image_url || product.image;
+        const image = escapeHtml(product.studio_image_url || product.image_url || 'https://johnmelogay.github.io/ZenaideSImoes/logo512.png');
 
         // Deep link with correct casing
         const deepLink = `https://johnmelogay.github.io/ZenaideSImoes/#/produto/${productId}`;
@@ -56,7 +61,8 @@ Deno.serve(async (req) => {
 
         // Detect User-Agent to differentiate between bots (WhatsApp/Facebook) and real users
         const userAgent = req.headers.get('user-agent') || '';
-        const isBot = /facebookexternalhit|WhatsApp|Twitterbot|TelegramBot|Discordbot|LinkedInBot|Slackbot|SkypeUriPreview|Applebot/i.test(userAgent);
+        const isBot = /facebookexternalhit|facebookcatalog|Twitterbot|TelegramBot|Discordbot|LinkedInBot|Slackbot|SkypeUriPreview|Applebot/i.test(userAgent)
+            || (/^WhatsApp\//i.test(userAgent) && !userAgent.includes('Mozilla'));
 
         // If it's a real user, redirect immediately (302) to avoid showing raw HTML
         if (!isBot) {
@@ -90,7 +96,7 @@ Deno.serve(async (req) => {
   <meta http-equiv="refresh" content="0;url=${deepLink}">
 </head>
 <body>
-  <p>Redirecionando para <a href="${deepLink}">${product.name}</a>...</p>
+  <p>Redirecionando para <a href="${deepLink}">${escapeHtml(product.name)}</a>...</p>
 </body>
 </html>`;
 
@@ -101,8 +107,8 @@ Deno.serve(async (req) => {
             },
         });
 
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+    } catch {
+        return new Response(JSON.stringify({ error: 'Não foi possível abrir este produto.' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
         });

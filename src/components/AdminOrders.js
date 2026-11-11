@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getOptimizedImageUrl, imagePresets } from '../services/supabase';
-import { Search, Filter, MessageCircle, Package, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, Copy, ExternalLink, Save, X } from 'lucide-react';
+import { RefreshCw, MessageCircle, Package, Truck, CheckCircle, Clock, AlertCircle, ChevronDown, ChevronUp, ExternalLink, Save, X } from 'lucide-react';
 
 export default function AdminOrders() {
     const [orders, setOrders] = useState([]);
@@ -103,7 +103,13 @@ export default function AdminOrders() {
         const name = order.customer_name.split(' ')[0];
         const tracking = order.tracking_code || editTracking;
 
-        switch (order.status) {
+        if (order.checkout_source === 'product_link' && order.payment_status === 'paid' && ['paid', 'processing'].includes(order.status)) {
+            msg = `Olá, ${name}! Aqui é a Zenaide. Recebi o pagamento do pedido #${order.id.slice(0, 8)}.`
+                + (order.address_data?.street ? `\nVou preparar para entregar em: ${order.address_data.street}, ${order.address_data.number} — ${order.address_data.district}, ${order.address_data.city}/${order.address_data.state}.` : '')
+                + '\nQual o melhor horário para a entrega?';
+        }
+
+        if (!msg) switch (order.status) {
             case 'pending':
                 msg = `Olá ${name}! Tudo bem? Vi que seu pedido #${order.id.slice(0, 8)} está pendente. Posso ajudar a finalizar?`;
                 if (order.payment_link) msg += ` Aqui está o link: ${order.payment_link}`;
@@ -127,13 +133,17 @@ export default function AdminOrders() {
                 msg = `Olá ${name}! Tudo bem? Gostaria de falar sobre o seu pedido #${order.id.slice(0, 8)}.`;
         }
 
-        const phone = order.customer_phone.replace(/\D/g, '');
-        window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        const digits = order.customer_phone.replace(/\D/g, '');
+        const phone = digits.length > 11 && digits.startsWith('55') ? digits : `55${digits}`;
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
     };
 
-    const filteredOrders = filterStatus === 'all'
-        ? orders
-        : orders.filter(o => o.status === filterStatus);
+    const filteredOrders = orders.filter(order => {
+        if (filterStatus === 'all') return true;
+        if (filterStatus === 'prepare') return ['paid', 'processing'].includes(order.status) &&
+            (order.checkout_source !== 'product_link' || order.payment_status === 'paid');
+        return order.status === filterStatus;
+    });
 
     if (loading) return <div className="p-8 text-center text-stone-500">Carregando pedidos...</div>;
 
@@ -144,10 +154,13 @@ export default function AdminOrders() {
                 <div className="flex items-center gap-2 text-stone-600">
                     <Package size={20} />
                     <span className="font-bold">{filteredOrders.length} Pedidos</span>
+                    <button type="button" onClick={fetchOrders} aria-label="Atualizar pedidos" className="inline-flex min-h-11 items-center gap-1 px-2 text-sm">
+                        <RefreshCw size={16} /> Atualizar
+                    </button>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
-                    {['all', 'pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => (
+                    {['all', 'prepare', 'pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
@@ -156,7 +169,7 @@ export default function AdminOrders() {
                                 : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                                 }`}
                         >
-                            {status === 'all' ? 'Todos' : getStatusLabel(status)}
+                            {status === 'all' ? 'Todos' : status === 'prepare' ? 'Para preparar' : getStatusLabel(status)}
                         </button>
                     ))}
                 </div>
@@ -231,7 +244,7 @@ export default function AdminOrders() {
                                                         <div className="flex-1">
                                                             <p className="text-xs md:text-sm font-bold text-stone-800 line-clamp-1">{item.name}</p>
                                                             <div className="flex justify-between items-center mt-1">
-                                                                <p className="text-[10px] md:text-xs text-stone-500">Qtd: {item.qty || 1}</p>
+                                                                <p className="text-[10px] md:text-xs text-stone-500">Qtd: {item.qty || 1}{item.size_label ? ` · Tam. ${item.size_label}` : ''}</p>
                                                                 <p className="text-xs md:text-sm font-bold text-stone-900">R$ {Number(item.price).toFixed(2)}</p>
                                                             </div>
                                                             <p className="text-[10px] md:text-xs text-stone-400 mt-1">Total: R$ {((item.qty || 1) * Number(item.price)).toFixed(2)}</p>
@@ -244,14 +257,27 @@ export default function AdminOrders() {
                                         <div className="bg-stone-50 p-3 md:p-4 rounded-xl border border-stone-100">
                                             <h4 className="text-xs font-bold uppercase text-stone-400 mb-2">Endereço de Entrega</h4>
                                             <p className="text-xs md:text-sm text-stone-600">
-                                                {order.address_data?.address}, {order.address_data?.number}<br />
-                                                {order.address_data?.component && <>{order.address_data.complement}<br /></>}
-                                                {order.address_data?.neighborhood} - {order.address_data?.city}/{order.address_data?.state}<br />
-                                                CEP: {order.address_data?.cep}
+                                                {order.address_data?.street ? <>
+                                                    {order.address_data.street}, {order.address_data.number}
+                                                    {order.address_data.complement ? ` — ${order.address_data.complement}` : ''}<br />
+                                                    {order.address_data.district} - {order.address_data.city}/{order.address_data.state}<br />
+                                                    CEP: {order.address_data.cep}
+                                                </> : order.checkout_source === 'product_link' ? 'Combine a entrega pelo WhatsApp.' : 'Endereço não informado.'}
                                             </p>
+                                            {(order.delivery_method || Number(order.delivery_fee) > 0) && (
+                                                <p className="mt-2 text-xs text-stone-600">
+                                                    Entrega: {order.delivery_method || 'a combinar'}
+                                                    {Number(order.delivery_fee) > 0 ? ` · R$ ${Number(order.delivery_fee).toFixed(2)}` : ''}
+                                                </p>
+                                            )}
+                                            {order.customer_email && <p className="mt-1 break-all text-xs text-stone-500">{order.customer_email}</p>}
                                         </div>
 
-                                        {order.payment_link && (
+                                        {order.stock_needs_review && (
+                                            <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Pagamento recebido. Confira o estoque antes de combinar a entrega.</p>
+                                        )}
+
+                                        {order.payment_link && order.payment_status !== 'paid' && (
                                             <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100 cursor-pointer hover:bg-green-100 transition-colors" onClick={() => copyToClipboard(order.payment_link)}>
                                                 <h4 className="text-xs font-bold uppercase text-green-700 mb-1 flex items-center gap-2">
                                                     Link de Pagamento <ExternalLink size={12} />
@@ -275,7 +301,7 @@ export default function AdminOrders() {
                                                         className="w-full p-2 border border-stone-200 rounded-lg bg-white focus:border-amber-500 outline-none transition-colors text-sm"
                                                     >
                                                         <option value="pending">Pendente</option>
-                                                        <option value="paid">Pago</option>
+                                                        <option value="paid" disabled={order.checkout_source === 'product_link' && order.payment_status !== 'paid'}>Pago</option>
                                                         <option value="processing">Separando</option>
                                                         <option value="shipped">Enviado</option>
                                                         <option value="delivered">Entregue</option>
@@ -308,7 +334,7 @@ export default function AdminOrders() {
                                             <div className="p-4 bg-green-50 rounded-xl border border-green-100">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <MessageCircle size={16} className="text-green-600" />
-                                                    <span className="text-sm font-bold text-green-800">WhatsApp Automático</span>
+                                                    <span className="text-sm font-bold text-green-800">WhatsApp</span>
                                                 </div>
                                                 <p className="text-xs text-green-700 mb-3">
                                                     Mensagem pronta para status: <strong>{getStatusLabel(editStatus || order.status)}</strong>
@@ -317,7 +343,7 @@ export default function AdminOrders() {
                                                     onClick={() => handleWhatsAppNotify(order)}
                                                     className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors shadow-sm"
                                                 >
-                                                    Enviar Mensagem no Zap
+                                                    {order.checkout_source === 'product_link' && order.payment_status === 'paid' && ['paid', 'processing'].includes(order.status) ? 'Combinar entrega no WhatsApp' : 'Abrir mensagem no WhatsApp'}
                                                 </button>
                                             </div>
                                             <p className="text-xs text-stone-400 mt-2 text-center">Tel: {order.customer_phone}</p>

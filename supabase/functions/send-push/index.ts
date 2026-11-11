@@ -12,8 +12,13 @@ serve(async (req) => {
         return new Response('ok', { headers: corsHeaders })
     }
 
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceKey || req.headers.get('Authorization') !== `Bearer ${serviceKey}`) {
+        return Response.json({ error: 'Não autorizado.' }, { status: 401, headers: corsHeaders })
+    }
+
     try {
-        const { title, body, url, orderId } = await req.json()
+        const { title, body, url } = await req.json()
 
         // VAPID config
         const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY') ?? ''
@@ -24,8 +29,7 @@ serve(async (req) => {
 
         // Init Supabase
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        const supabase = createClient(supabaseUrl, supabaseKey)
+        const supabase = createClient(supabaseUrl, serviceKey)
 
         // Fetch all push subscriptions
         const { data: subscriptions, error } = await supabase

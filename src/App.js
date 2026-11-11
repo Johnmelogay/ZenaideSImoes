@@ -3,6 +3,9 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabase';
 import { CustomerProvider, useCustomer } from './contexts/CustomerContext';
 import ClarityConsent from './components/ClarityConsent';
+import PublicProduct from './pages/PublicProduct';
+import SalesLink from './pages/SalesLink';
+import OrderStatus from './pages/OrderStatus';
 
 // Pages
 import Store from './pages/Store';
@@ -68,7 +71,7 @@ const PaymentRedirectHandler = () => {
     }
 
     // Payment redirect
-    if (params.get('transaction_id') || params.get('order_nsu') || params.get('id')) {
+    if (params.get('transaction_nsu') || params.get('transaction_id') || params.get('order_nsu') || params.get('id')) {
       const basePath = window.location.pathname;
       window.location.replace(`${basePath}#/sucesso?${params.toString()}`);
     }
@@ -102,7 +105,9 @@ export default function App() {
         <ClarityConsent>
           <Routes>
             <Route path="/" element={<HomeRoute />} />
-            <Route path="/produto/:productId" element={<HomeRoute />} />
+            <Route path="/produto/:productId" element={<PublicProduct />} />
+            <Route path="/p/:token" element={<SalesLink />} />
+            <Route path="/pedido/:token" element={<OrderStatus />} />
             <Route path="/sucesso" element={<Success />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route

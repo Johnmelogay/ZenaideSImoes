@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { shareProductOnWhatsApp } from '../services/productLinks';
 import { supabase } from '../services/supabase';
-import { Plus, Trash2, Edit2, LogOut, Image as ImageIcon, Save, X, Download, Upload, Search, Package, AlertTriangle, TrendingUp, ShoppingBag, Grid, ChevronUp, ChevronDown, Layers, Tag, Zap, Settings, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, LogOut, Image as ImageIcon, Save, X, Download, Upload, Search, Package, AlertTriangle, TrendingUp, ShoppingBag, Grid, ChevronUp, ChevronDown, Layers, Tag, Zap, Settings, Check, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import AdminOrders from '../components/AdminOrders';
 import AdminCoupons from '../components/AdminCoupons';
+import AdminLinks from '../components/AdminLinks';
 
 // Helper to convert VAPID key from base64 string to Uint8Array
 function urlBase64ToUint8Array(base64String) {
@@ -571,7 +573,8 @@ export default function AdminDashboard() {
                 price: typeof formData.price === 'string'
                     ? parseFloat(formData.price.replace(',', '.'))
                     : formData.price,
-                stock_quantity: parseInt(formData.stock_quantity) || 0
+                stock_quantity: parseInt(formData.stock_quantity) || 0,
+                available_sizes: Array.isArray(formData.available_sizes) ? formData.available_sizes : []
             };
 
             if (editing?.id) {
@@ -626,7 +629,9 @@ export default function AdminDashboard() {
             stock_quantity: 0,
             is_new: false,
             is_visible: true,
-            sku: ''
+            sku: '',
+            size_label: '',
+            available_sizes: []
         });
     };
 
@@ -781,6 +786,7 @@ export default function AdminDashboard() {
                     {[
                         { id: 'products', icon: Grid, label: 'Produtos' },
                         { id: 'orders', icon: ShoppingBag, label: 'Pedidos', badge: newOrderCount },
+                        { id: 'links', icon: Share2, label: 'Links' },
                         { id: 'categories', icon: Layers, label: 'Categorias' },
                         { id: 'coupons', icon: Tag, label: 'Cupons' },
                         { id: 'settings', icon: Settings, label: 'Config' },
@@ -805,7 +811,9 @@ export default function AdminDashboard() {
 
             <div className="max-w-7xl mx-auto p-3 md:p-6 space-y-4">
 
-                {activeTab === 'orders' ? (
+                {activeTab === 'links' ? (
+                    <AdminLinks />
+                ) : activeTab === 'orders' ? (
                     <AdminOrders />
                 ) : activeTab === 'coupons' ? (
                     <AdminCoupons />
@@ -1282,6 +1290,11 @@ export default function AdminDashboard() {
                                     </div>
 
                                     <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                        {product.is_visible && (
+                                            <button type="button" onClick={() => shareProductOnWhatsApp(product)} aria-label="Compartilhar peça pelo WhatsApp" className="p-2 bg-white text-green-700 rounded-lg shadow-sm border border-stone-200">
+                                                <Share2 size={16} />
+                                            </button>
+                                        )}
                                         <button onClick={() => handleEdit(product)} className="p-1.5 bg-white text-stone-600 rounded-lg shadow-sm border border-stone-200 hover:text-amber-600">
                                             <Edit2 size={14} />
                                         </button>
@@ -1437,6 +1450,21 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
 
+                                    <label className="block text-sm font-medium">
+                                        Tamanho ou medida da peça
+                                        <input value={formData.size_label || ''} maxLength={100}
+                                            onChange={e => setFormData({ ...formData, size_label: e.target.value })}
+                                            placeholder="Ex.: Aro 18 ou 45 cm"
+                                            className="mt-1 w-full rounded-xl border border-stone-200 p-3" />
+                                    </label>
+                                    <label className="block text-sm font-medium">
+                                        Tamanhos de anel disponíveis
+                                        <input value={(formData.available_sizes || []).join(', ')}
+                                            onChange={e => setFormData({ ...formData, available_sizes: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
+                                            placeholder="Ex.: 14, 16, 18, 20 (deixe vazio se não for anel)"
+                                            className="mt-1 w-full rounded-xl border border-stone-200 p-3" />
+                                        <span className="mt-1 block text-[11px] text-stone-400">A cliente só poderá escolher entre esses tamanhos.</span>
+                                    </label>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Estoque</label>

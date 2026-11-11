@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ShoppingBag, Home, Heart, Search, User, Plus, Minus, Check, MessageCircle, X, ChevronRight, Package, LogOut, Sparkles, Crown, ChevronDown, CreditCard, Tag, Ticket, Lock, Edit3, Share2, AlertTriangle, SlidersHorizontal, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
+import { shareProductOnWhatsApp } from '../services/productLinks';
 import { supabase, getOptimizedImageUrl, imagePresets } from '../services/supabase';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -188,7 +189,7 @@ const ProductCard = ({ product, onAdd, isAdded, onClick, onFav, isFav }) => (
     >
         <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-stone-100 isolate">
             <img
-                src={getOptimizedImageUrl(product.image_url || product.image, imagePresets.thumbnail)}
+                src={getOptimizedImageUrl(product.studio_image_url || product.image_url || product.image, imagePresets.thumbnail)}
                 alt={product.name}
                 loading="lazy"
                 decoding="async"
@@ -405,9 +406,7 @@ const ProductDetails = ({ product, isOpen, onClose, onAdd }) => {
 
     if (!isOpen || !product) return null;
 
-    const images = product.images && product.images.length > 0
-        ? product.images
-        : [product.image_url || product.image];
+    const images = [...new Set([product.studio_image_url, product.image_url || product.image, ...(product.images || [])].filter(Boolean))];
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center isolate">
@@ -471,11 +470,7 @@ const ProductDetails = ({ product, isOpen, onClose, onAdd }) => {
                                 </div>
                                 {/* Share Button */}
                                 <button
-                                    onClick={() => {
-                                        const shareUrl = `https://bydedlfccgywqshzllmz.supabase.co/functions/v1/share?id=${product.id}`;
-                                        const text = `✨ Olha essa peça linda da Zenaide Simões!\n\n*${product.name}*\nR$ ${Number(product.price).toFixed(2)}\n\n`;
-                                        window.open(`https://wa.me/?text=${encodeURIComponent(text + shareUrl)}`, '_blank');
-                                    }}
+                                    onClick={() => shareProductOnWhatsApp(product)}
                                     className="p-2.5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 active:scale-95 transition-all"
                                     title="Compartilhar via WhatsApp"
                                 >

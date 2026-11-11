@@ -1,150 +1,82 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
-const corsHeaders = {
+const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+const reply = (body: object, status = 200) => Response.json(body, { status, headers });
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const db = createClient(supabaseUrl, serviceKey);
 
-serve(async (req) => {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
-    }
+Deno.serve(async request => {
+    if (request.method === 'OPTIONS') return new Response(null, { headers });
+    if (request.method !== 'POST') return reply({ error: 'Método indisponível.' }, 405);
 
     try {
-        const payload = await req.json()
-        console.log("Webhook Payload received:", JSON.stringify(payload));
-
-        // Initialize Supabase Client
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        const supabase = createClient(supabaseUrl, supabaseKey)
-
-        // Extract Information
-        // InfinitePay Webhook structure varies, but we expect 'data' or root fields.
-        // We sent 'order_nsu' as our internal order_id.
-        // Common fields: event, data { id, attributes { status, metadata... } }
-
-        // Strategy: Look for order_nsu or metadata.order_id
-        let orderId = payload.order_nsu || payload?.data?.attributes?.order_nsu || payload?.metadata?.order_id;
-
-        // If strict path fails, try finding it in the whole object (naive search) if needed, 
-        // but order_nsu at root is most likely based on our checkout creation.
-
-        const status = payload.status || payload?.data?.attributes?.status; // e.g. 'paid', 'approved'
-        const transactionId = payload.id || payload?.data?.id;
-
-        if (!orderId) {
-            console.error("No Order ID found in payload");
-            return new Response(JSON.stringify({ error: "No Order ID found" }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
+        const payload = await request.json();
+        const orderId = payload.order_nsu;
+        const slug = payload.invoice_slug || payload.slug;
+        const transaction = payload.transaction_nsu;
+        if (typeof orderId !== 'string' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(orderId)
+            || typeof slug !== 'string' || slug.length < 1 || slug.length > 160
+            || typeof transaction !== 'string' || transaction.length < 1 || transaction.length > 160) {
+            return reply({ error: 'Dados insuficientes para confirmar o pagamento.' }, 400);
         }
 
-        // Map InfinitePay status to our status
-        // InfinitePay: 'approved', 'paid', 'canceled', 'refused'
-        // Our DB: 'pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'
-
-        let dbStatus = 'pending';
-        const s = String(status).toLowerCase();
-        console.log(`Processing status: ${s} for Order ${orderId}`);
-
-        if (['paid', 'approved', 'succeeded', 'completed'].includes(s)) {
-            dbStatus = 'paid';
-        } else if (['canceled', 'refused', 'failed', 'refunded'].includes(s)) {
-            dbStatus = 'cancelled';
-        } else {
-            console.log(`Status '${s}' does not require DB update (keeping pending).`);
-            // Default to not updating unless it satisfies a condition, 
-            // but if we want to track 'created' etc, we could.
+        const handle = Deno.env.get('INFINITE_TAG')?.trim().replace(/^\$/, '');
+        if (!handle) return reply({ error: 'Pagamento indisponível.' }, 503);
+        const apiKey = Deno.env.get('INFINITE_API_KEY');
+        const verification = await fetch('https://api.checkout.infinitepay.io/payment_check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'X-Api-Key': apiKey } : {}) },
+            signal: AbortSignal.timeout(8000),
+            body: JSON.stringify({ handle, order_nsu: orderId, transaction_nsu: transaction, slug }),
+        });
+        if (!verification.ok) return reply({ error: 'Confirmação indisponível.' }, 502);
+        const payment = await verification.json();
+        if (payment.success !== true || payment.paid !== true || !Number.isSafeInteger(payment.amount) || payment.amount <= 0) {
+            return reply({ paid: false });
         }
 
-        // Update Database
-        if (dbStatus !== 'pending') {
-            const { error: updateError } = await supabase
-                .from('orders')
-                .update({
-                    status: dbStatus,
-                    payment_status: dbStatus, // Keep both columns in sync
-                    payment_id: transactionId,
-                    infinite_metadata: payload, // save full payload for debug
-                })
-                .eq('id', orderId);
-
-            if (updateError) {
-                console.error("Error updating order:", updateError);
-                throw updateError;
+        const { data: result, error } = await db.rpc('record_verified_payment', {
+            p_order_id: orderId, p_transaction: transaction, p_amount_cents: payment.amount,
+        });
+        if (error) throw new Error('Falha ao registrar confirmação');
+        if (result === 'paid' || result === 'paid_stock_review') {
+            EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/send-push`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Novo pedido pago',
+                    body: result === 'paid_stock_review'
+                        ? 'Abra o painel para conferir o estoque antes de preparar a entrega.'
+                        : 'Abra o painel para preparar a entrega.',
+                    url: './#/admin',
+                }),
+            }).then(response => {
+                if (!response.ok) console.error('Falha no aviso do pedido pago', response.status);
+            }).catch(() => console.error('Falha de rede no aviso do pedido pago')));
+        }
+        if (result === 'paid' || result === 'paid_stock_review' || result === 'already_paid') {
+            const { data: paidOrder } = await db.from('orders')
+                .select('sales_link_token').eq('id', orderId).maybeSingle();
+            if (paidOrder?.sales_link_token) {
+                await db.from('sales_links')
+                    .update({ status: 'sold' })
+                    .eq('token', paidOrder.sales_link_token)
+                    .eq('status', 'active');
             }
-            console.log(`Order ${orderId} updated to ${dbStatus}`);
-
-            // DECREMENT STOCK IF PAID
-            if (dbStatus === 'paid') {
-                const { data: orderData, error: fetchError } = await supabase
-                    .from('orders')
-                    .select('items')
-                    .eq('id', orderId)
-                    .single();
-
-                if (orderData?.items) {
-                    for (const item of orderData.items) {
-                        if (item.id) {
-                            await supabase.rpc('decrement_stock', {
-                                product_id: item.id,
-                                quantity: 1 // We force 1 for now as cart doesn't seem to support qty > 1 per item line properly yet, or we check item.quantity
-                            });
-                        }
-                    }
-                    console.log(`Stock decremented for order ${orderId}`);
-                }
-
-                // SEND PUSH NOTIFICATION
-                try {
-                    const { data: fullOrder } = await supabase
-                        .from('orders')
-                        .select('*')
-                        .eq('id', orderId)
-                        .single();
-
-                    const customerName = fullOrder?.customer_name || fullOrder?.customer_email || 'Cliente';
-                    const total = Number(fullOrder?.total || 0).toFixed(2);
-                    const itemCount = fullOrder?.items?.length || 0;
-
-                    const pushRes = await fetch(
-                        `${supabaseUrl}/functions/v1/send-push`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${supabaseKey}`,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                title: `🛍️ Novo Pedido — R$ ${total}`,
-                                body: `${customerName} • ${itemCount} item(s)`,
-                                url: `./#/admin`,
-                                orderId: orderId
-                            })
-                        }
-                    );
-                    console.log(`Push notification sent: ${pushRes.status}`);
-                } catch (pushErr) {
-                    console.error('Push notification error (non-fatal):', pushErr);
-                }
-            }
-        } else {
-            // Just log metadata if status isn't one we care about changing (like 'created')
-            await supabase.from('orders').update({ infinite_metadata: payload }).eq('id', orderId);
         }
-
-        return new Response(
-            JSON.stringify({ message: "Webhook processed", order_id: orderId, new_status: dbStatus }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        )
-
-    } catch (error) {
-        console.error('Webhook Error:', error);
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-        )
+        if (result === 'amount_mismatch' || result === 'different_transaction') {
+            console.error('Pagamento precisa de conciliação', orderId, result);
+        }
+        return reply({ paid: ['paid', 'paid_stock_review', 'already_paid'].includes(result) });
+    } catch {
+        console.error('Falha ao confirmar pagamento InfinitePay');
+        return reply({ error: 'Não foi possível verificar o pagamento agora.' }, 502);
     }
-})
+});
